@@ -23,7 +23,7 @@ def squarePipe(crv,width,height,subDiv,xAxis=[]):
         param = rs.CurveClosestPoint(crv,divPts[i])
         tan = rs.CurveTangent(crv,param)
         if len(xAxis)>0:
-            plane = rs.PlaneFromNormal(divPts[i],tan,xAxis)
+            plane = rs.PlaneFromNormal(divPts[i],tan)
         else:
             plane = rs.PlaneFromNormal(divPts[i],tan)
         sections.append(rs.AddRectangle(plane,width,height))
@@ -36,6 +36,7 @@ def Main():
     #crvs = rs.GetObjects("please select curves to squarePipe on surface",rs.filter.curve)
     spines = rs.GetObjects("please select curves to squarePipe",rs.filter.curve)
     subDiv = rs.GetInteger("please enter resolution",10)
+    vector = rs.GetObject("please select vector line",rs.filter.curve)
     pipes = []
     copySrfs = []
     #for i in range(len(srfs)):
@@ -45,10 +46,10 @@ def Main():
     #        copySrfs.append(rs.CopyObject(srfs[i]))
     #for i in range(len(crvs)):
         #pipes.append(squarePipeOnSrf(crvs[i],copySrfs,.0254,.05))
+    xAxis = rs.VectorCreate(rs.CurveStartPoint(vector),rs.CurveEndPoint(vector))
     for i in range(len(spines)):
         #crv = rs.PointClosestObject(rs.CurveStartPoint(spines[i]),crvs)[0]
-        #param = rs.CurveClosestPoint(crv,rs.CurveStartPoint(spines[i]))
-        xAxis = rs.CurveTangent(crv,param)
+        param = rs.CurveClosestPoint(spines[i],rs.CurveStartPoint(spines[i]))
         pipes.append(squarePipe(spines[i],.32,.17,subDiv,xAxis))
     rs.DeleteObjects(copySrfs)
     return pipes

@@ -66,7 +66,7 @@ def Main():
     isoPairs = []
     fillets = []
     waste = []
-    thres = .2
+    thres = 5
     for i in range(len(crvs)):
         pair = []
         start = rs.CurveStartPoint(crvs[i])
