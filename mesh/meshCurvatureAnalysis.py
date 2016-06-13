@@ -15,62 +15,35 @@ class contours:
             self.position = rs.PointAdd(self.position,self.pts[i])
         self.position = self.position/len(self.pts)
     def locateVCrvs(self):
-        sorted = []
-        for j in range(len(self.pts)):
-            sorted.append(rs.PointClosestObject(self.pts[j],self.vCrvs)[0])
-        self.vCrvs = sorted
-        return self.vCrvs
+        sortedV = []
+        for i in range(len(self.pts)):
+            minDist = 10000000
+            for j in range(len(self.vCrvs)): 
+                param = rs.CurveClosestPoint(self.vCrvs[j],self.pts[i])
+                closePt = rs.EvaluateCurve(self.vCrvs[j],param)
+                dist = rs.Distance(closePt,self.pts[i])
+                if dist<minDist:
+                    minDist = dist
+                    closest = j
+            sortedV.append(self.vCrvs[closest])
+        return sortedV
     def uCurvature(self):
         Curvatures = []
         for i in range(len(self.pts)):
             param = rs.CurveClosestPoint(self.crv,self.pts[i])
-            tan = rs.CurveTangent(self.crv,param)
-            param = rs.CurveNormalizedParameter(self.crv,param)
-            reso = self.reso/rs.CurveLength(self.crv)
-            if param<(1-reso):
-                nextParam = param+reso
-            else:
-                nextParam = param-reso
-            regParam = rs.CurveParameter(self.crv,nextParam)
-            tanNext = rs.CurveTangent(self.crv,regParam)
-            Curvatures.append(rs.VectorSubtract(tan,tanNext))
+            Curvatures.append(rs.CurveCurvature(self.crv,param)[3])
         return Curvatures
     def vCurvature(self):
         Curvatures = []
+        sortedV = self.locateVCrvs()
         for i in range(len(self.pts)):
-            param = rs.CurveClosestPoint(self.vCrvs[i],self.pts[i])
-            tan = rs.CurveTangent(self.vCrvs[i],param)
-            param = rs.CurveNormalizedParameter(self.vCrvs[i],param)
-            reso = self.reso/rs.CurveLength(self.vCrvs[i])
-            if param<(1-reso):
-                nextParam = param+reso
-            else:
-                nextParam = param-reso
-            regParam = rs.CurveParameter(self.vCrvs[i],nextParam)
-            tanNext = rs.CurveTangent(self.vCrvs[i],regParam)
-            Curvatures.append(rs.VectorSubtract(tan,tanNext))
+            param = rs.CurveClosestPoint(sortedV[i],self.pts[i])
+            Curvatures.append(rs.CurveCurvature(sortedV[i],param)[3])
         return Curvatures
     def collectUV(self):
         self.uVals = self.uCurvature()
         self.vCrvs = self.locateVCrvs()
-        self.vVals = self.vCurvature()
-    def colorCurvature(self):
-        self.collectUV()
-        maxU = self.uVals[0]
-        maxV = self.vVals[0]
-        for i in range(len(self.uVals)):
-            length = rs.VectorLength(self.uVals[i])
-            if length>maxU:
-                maxU = length
-        for i in range(len(self.vVals)):
-            length = rs.VectorLength(self.vVals[i])
-            if length>maxV:
-                maxV = length
-        for i in range(len(self.uVals)):
-            colorU = rs.VectorLength(self.uVals[i])/(maxU+.001)*255
-            colorV = rs.VectorLength(self.vVals[i])/(maxV+.001)*255
-            self.colors.append([colorU,colorV,0])
-        return self.colors
+        self.vVals = self.vCurvature() 
 
 def curvekey(curve):
     point = rs.CurveStartPoint(curve)
@@ -109,8 +82,15 @@ def Main():
     vCrvs = SortCurvesByZ(vCrvs)
     myContours = []
     vertices = rs.MeshVertices(mesh)
+    rebuiltV = []
     positions =[]
+    red = []
+    green = []
     colors = []
+    for i in range(len(vCrvs)):
+        rebuild = rs.CopyObject(vCrvs[i])
+        rs.RebuildCurve(rebuild,3,300)
+        rebuiltV.append(rebuild)
     for i in range(len(uCrvs)):
         evalPts=[]
         for j in range(len(vCrvs)):
@@ -119,15 +99,28 @@ def Main():
                 for i in range(len(intersectionPts)):
                     if intersectionPts[i][0]==1:
                         evalPts.append(intersectionPts[i][1])
-        myContours.append(contours(evalPts,uCrvs[i],vCrvs,.01))
+        rebuildU = rs.CopyObject(uCrvs[i])
+        rs.RebuildCurve(rebuildU,3,300)
+        myContours.append(contours(evalPts,rebuildU,rebuiltV,.01))
+    maxRed = 0
+    maxGreen = 0
     for i in range(len(myContours)):
         positions.append(myContours[i].position)
     for i in range(len(vertices)):
         contourIndex = rs.PointArrayClosestPoint(positions,vertices[i])
         indexEvalPt = rs.PointArrayClosestPoint(myContours[contourIndex].pts,vertices[i])
-        myContours[contourIndex].colorCurvature()
-        colors.append(myContours[contourIndex].colors[indexEvalPt])
-        if myContours[contourIndex].colors[indexEvalPt][0]>200:
-            rs.AddPoint(myContours[contourIndex].pts[indexEvalPt])
+        myContours[contourIndex].collectUV()
+        red.append(myContours[contourIndex].uVals[indexEvalPt])
+        green.append(myContours[contourIndex].vVals[indexEvalPt])
+    for i in range(len(vertices)):
+        if red[i]>maxRed:
+            maxRed = red[i]
+        if green[i]>maxGreen:
+            maxGreen = green[i]
+    for i in range(len(vertices)):
+        red[i] = red[i]/(maxRed+.001)*255
+        green[i] = green[i]/(maxGreen+.001)*255
+        colors.append([red[i],green[i],0])
+    rs.MeshVertexColors(mesh,colors)
 
 Main()
