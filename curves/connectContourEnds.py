@@ -1,11 +1,14 @@
 import rhinoscriptsyntax as rs
 import math as m
 
-def orientCrvs(crvs,pt):
+def orientCrvs(crvs,pt,refLine):
     dists = []
     indexes = []
+    ref = rs.VectorCreate(rs.CurveEndPoint(refLine),rs.CurveStartPoint(refLine))
     for i in range(len(crvs)):
-        dists.append(rs.Distance(rs.CurveMidPoint(crvs[i]),pt))
+        vec = rs.VectorCreate(rs.CurveMidPoint(crvs[i]),pt)
+        amnt = rs.VectorDotProduct(vec,ref)
+        dists.append(amnt)
     for i in range(len(dists)):
         minimum = 10000000000000000000000000000000000
         for j in range(len(dists)):
@@ -31,14 +34,15 @@ def alignCrvs(crvs):
 def Main():
     crvs = rs.GetObjects("please select crvs to connect",rs.filter.curve)
     pt = rs.GetObject("please select orientation point",rs.filter.point)
-    crvs = orientCrvs(crvs,pt)
+    refLine = rs.GetObject("please select reference vector line",rs.filter.curve)
+    crvs = orientCrvs(crvs,pt,refLine)
     crvs = alignCrvs(crvs)
     sts = []
     ens = []
     for i in range(len(crvs)):
         sts.append(rs.CurveStartPoint(crvs[i]))
         ens.append(rs.CurveEndPoint(crvs[i]))
-    rs.AddCurve(ens)
-    rs.AddCurve(sts)
+    rs.AddInterpCurve(ens)
+    rs.AddInterpCurve(sts)
 
 Main()
